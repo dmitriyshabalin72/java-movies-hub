@@ -1,0 +1,10 @@
+./src/test/ru/practicum/moviehub/http/MoviesApiTest.java
+./src/test/ru/practicum/moviehub/http/ListOfMoviesTypeToken.java
+./src/main/ru/practicum/moviehub/http/BaseHttpHandler.java
+./src/main/ru/practicum/moviehub/http/ListOfMoviesTypeToken.java
+./src/main/ru/practicum/moviehub/http/MoviesHandler.java
+./src/main/ru/practicum/moviehub/http/MoviesServer.java
+./src/main/ru/practicum/moviehub/model/Movie.java
+./src/main/ru/practicum/moviehub/api/ErrorResponse.java
+./src/main/ru/practicum/moviehub/MovieHubApp.java
+./src/main/ru/practicum/moviehub/store/MoviesStore.java

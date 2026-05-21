@@ -13,6 +13,9 @@ import java.util.List;
 
 public class MoviesHandler extends BaseHttpHandler implements HttpHandler {
 
+    private static final int MAX_TITLE_LENGTH = 100;
+    private static final int FIRST_MOVIE_YEAR = 1888;
+
     private final MoviesStore store;
 
     public MoviesHandler(MoviesStore store) {
@@ -21,22 +24,14 @@ public class MoviesHandler extends BaseHttpHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-
-        String method = exchange.getRequestMethod();
-
-        switch (method) {
-            case "GET":
-                handleGet(exchange);
-                break;
-            case "POST":
-                handlePost(exchange);
-                break;
-            default:
-                sendJson(
-                        exchange,
-                        new ErrorResponse("Method Not Allowed", List.of()),
-                        405
-                );
+        switch (exchange.getRequestMethod()) {
+            case "GET" -> handleGet(exchange);
+            case "POST" -> handlePost(exchange);
+            default -> sendError(
+                    exchange,
+                    "Method Not Allowed",
+                    405
+            );
         }
     }
 
@@ -46,32 +41,15 @@ public class MoviesHandler extends BaseHttpHandler implements HttpHandler {
 
     private void handlePost(HttpExchange exchange) throws IOException {
 
-        String contentType =
-                exchange.getRequestHeaders().getFirst("Content-Type");
-
-        if (contentType == null ||
-                !contentType.contains("application/json")) {
-
-            sendJson(
-                    exchange,
-                    new ErrorResponse("Unsupported Media Type", List.of()),
-                    415
-            );
+        if (!isJsonRequest(exchange)) {
+            sendError(exchange, "Unsupported Media Type", 415);
             return;
         }
 
-        String body = new String(exchange.getRequestBody().readAllBytes());
+        Movie movie = parseMovie(exchange);
 
-        Movie movie;
-
-        try {
-            movie = gson.fromJson(body, Movie.class);
-        } catch (Exception e) {
-            sendJson(
-                    exchange,
-                    new ErrorResponse("Некорректный JSON", List.of()),
-                    400
-            );
+        if (movie == null) {
+            sendError(exchange, "Некорректный JSON", 400);
             return;
         }
 
@@ -86,30 +64,82 @@ public class MoviesHandler extends BaseHttpHandler implements HttpHandler {
             return;
         }
 
-        Movie saved = store.save(movie);
+        sendJson(exchange, store.save(movie), 201);
+    }
 
-        sendJson(exchange, saved, 201);
+    private boolean isJsonRequest(HttpExchange exchange) {
+        String contentType =
+                exchange.getRequestHeaders().getFirst("Content-Type");
+
+        return contentType != null &&
+                contentType.contains("application/json");
+    }
+
+    private Movie parseMovie(HttpExchange exchange) throws IOException {
+        try {
+            String body =
+                    new String(exchange.getRequestBody().readAllBytes());
+
+            return gson.fromJson(body, Movie.class);
+
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private List<String> validate(Movie movie) {
 
         List<String> errors = new ArrayList<>();
 
-        if (movie.getTitle() == null || movie.getTitle().isBlank()) {
-            errors.add("название не должно быть пустым");
-        }
-
-        if (movie.getTitle() != null &&
-                movie.getTitle().length() > 100) {
-            errors.add("title не должен быть длиннее 100 символов");
-        }
-
-        int maxYear = Year.now().getValue() + 1;
-
-        if (movie.getYear() < 1888 || movie.getYear() > maxYear) {
-            errors.add("год должен быть между 1888 и " + maxYear);
-        }
+        validateTitle(movie, errors);
+        validateYear(movie, errors);
 
         return errors;
+    }
+
+    private void validateTitle(Movie movie, List<String> errors) {
+
+        String title = movie.getTitle();
+
+        if (title == null || title.isBlank()) {
+            errors.add("название не должно быть пустым");
+            return;
+        }
+
+        if (title.length() > MAX_TITLE_LENGTH) {
+            errors.add(
+                    "title не должен быть длиннее "
+                            + MAX_TITLE_LENGTH
+                            + " символов"
+            );
+        }
+    }
+
+    private void validateYear(Movie movie, List<String> errors) {
+
+        int currentMaxYear = Year.now().getValue() + 1;
+        int year = movie.getYear();
+
+        if (year < FIRST_MOVIE_YEAR || year > currentMaxYear) {
+            errors.add(
+                    "год должен быть между "
+                            + FIRST_MOVIE_YEAR
+                            + " и "
+                            + currentMaxYear
+            );
+        }
+    }
+
+    private void sendError(
+            HttpExchange exchange,
+            String message,
+            int statusCode
+    ) throws IOException {
+
+        sendJson(
+                exchange,
+                new ErrorResponse(message, List.of()),
+                statusCode
+        );
     }
 }

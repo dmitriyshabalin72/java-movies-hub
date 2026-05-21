@@ -1,23 +1,34 @@
 package ru.practicum.moviehub.http;
 
 import com.google.gson.Gson;
-import ru.practicum.moviehub.http.MoviesServer;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import ru.practicum.moviehub.model.Movie;
-import org.junit.jupiter.api.*;
 
+import java.io.IOException;
 import java.net.URI;
-import java.net.http.*;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MoviesApiTest {
 
+    private static final String MOVIES_URL =
+            "http://localhost:8080/movies";
+
     private static MoviesServer server;
+
     private final Gson gson = new Gson();
+
+    private final HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(2))
+            .build();
 
     @BeforeAll
     static void start() {
@@ -31,52 +42,70 @@ public class MoviesApiTest {
     }
 
     @Test
-    @Order(1)
     void getMovies_whenEmpty_returnsEmptyArray() throws Exception {
 
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(2))
-                .build();
+        HttpResponse<String> response = sendGetMovies();
 
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:8080/movies"))
-                .GET()
-                .build();
-
-        HttpResponse<String> resp = client.send(req,
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-
-        assertEquals(200, resp.statusCode());
+        assertEquals(200, response.statusCode());
 
         List<Movie> movies = gson.fromJson(
-                resp.body(),
-                ru.practicum.moviehub.http.ListOfMoviesTypeToken.LIST_OF_MOVIES
+                response.body(),
+                ListOfMoviesTypeToken.LIST_OF_MOVIES
         );
 
         assertTrue(movies.isEmpty());
     }
 
     @Test
-    @Order(2)
     void postMovie_success_returnsCreatedMovie() throws Exception {
 
-        HttpClient client = HttpClient.newHttpClient();
+        Movie newMovie =
+                new Movie(0, "Interstellar", 2014);
 
-        String json = "{\"title\":\"Interstellar\",\"year\":2014}";
+        HttpResponse<String> response = postMovie(newMovie);
 
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:8080/movies"))
+        assertEquals(201, response.statusCode());
+
+        Movie savedMovie =
+                gson.fromJson(response.body(), Movie.class);
+
+        assertTrue(savedMovie.getId() > 0);
+        assertEquals("Interstellar", savedMovie.getTitle());
+        assertEquals(2014, savedMovie.getYear());
+    }
+
+    private HttpResponse<String> sendGetMovies()
+            throws IOException, InterruptedException {
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(MOVIES_URL))
+                .GET()
+                .build();
+
+        return client.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(
+                        StandardCharsets.UTF_8
+                )
+        );
+    }
+
+    private HttpResponse<String> postMovie(Movie movie)
+            throws IOException, InterruptedException {
+
+        String json = gson.toJson(movie);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(MOVIES_URL))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 
-        HttpResponse<String> resp = client.send(req,
-                HttpResponse.BodyHandlers.ofString());
-
-        assertEquals(201, resp.statusCode());
-
-        Movie movie = gson.fromJson(resp.body(), Movie.class);
-
-        assertTrue(movie.getId() > 0);
+        return client.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(
+                        StandardCharsets.UTF_8
+                )
+        );
     }
 }

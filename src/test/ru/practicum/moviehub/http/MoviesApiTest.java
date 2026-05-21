@@ -1,3 +1,5 @@
+package ru.practicum.moviehub.http;
+
 import com.google.gson.Gson;
 import ru.practicum.moviehub.http.MoviesServer;
 import ru.practicum.moviehub.model.Movie;
@@ -60,12 +62,7 @@ public class MoviesApiTest {
 
         HttpClient client = HttpClient.newHttpClient();
 
-        String json = """
-                {
-                    "title":"Interstellar",
-                    "year":2014
-                }
-                """;
+        String json = "{\"title\":\"Interstellar\",\"year\":2014}";
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:8080/movies"))
